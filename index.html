@@ -3,57 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Raw JSON Viewer</title>
+    <title>Mission Briefing - Reddit Feed</title>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
     <style>
-        body { 
-            background-color: #1e1e1e; 
-            color: #d4d4d4; 
-            font-family: 'Courier New', Courier, monospace; 
-            padding: 20px; 
+        :root {
+            --bg-root: #111111;
+            --bg-panel: #1f1f1f;
+            --bg-hover: #2d2d2d;
+            --border-color: #3b3b3b;
+            --text-main: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent-blue: #2899f5;
+            --top-bar-bg: #212121;
         }
-        pre { 
-            white-space: pre-wrap; 
-            word-wrap: break-word; 
-            background: #2d2d2d; 
-            padding: 15px; 
-            border-radius: 5px; 
-            border: 1px solid #444;
-        }
-        .error { color: #f44336; }
-        .loading { color: #ffeb3b; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background-color: var(--bg-root); color: var(--text-main); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+        /* Navigation Components */
+        .top-bar { height: 48px; background-color: var(--top-bar-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 10; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .app-rail { width: 48px; background-color: var(--bg-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 20px; }
+        .folder-pane { width: 220px; background-color: var(--bg-root); border-right: 1px solid var(--border-color); padding: 16px 0; }
+
+        /* Inbox List (Scrollable) */
+        .message-list { width: 350px; background-color: var(--bg-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .list-header { padding: 16px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid var(--border-color); background: var(--bg-panel); }
+        #inbox-container { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border-color) transparent; }
+        
+        .msg-item { padding: 12px 16px; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; }
+        .msg-item:hover { background-color: var(--bg-hover); }
+        .msg-item.active { background-color: #293846; border-left: 3px solid var(--accent-blue); }
+        .msg-sender { font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .msg-subject { font-size: 0.85rem; color: var(--accent-blue); font-weight: 500; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-preview { font-size: 0.8rem; color: var(--text-secondary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        /* Reading Pane */
+        .reading-pane { flex: 1; background-color: var(--bg-root); padding: 32px; overflow-y: auto; }
+        .email-header { border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 24px; }
+        .email-subject { font-size: 1.6rem; font-weight: bold; margin-bottom: 16px; color: var(--text-main); }
+        .email-meta { display: flex; align-items: center; gap: 12px; }
+        .avatar { width: 40px; height: 40px; background-color: #555; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .email-body { font-size: 1rem; line-height: 1.7; color: #e0e0e0; max-width: 900px; }
+        
+        .loading-state { padding: 20px; text-align: center; color: var(--accent-blue); font-size: 0.9rem; }
     </style>
 </head>
 <body>
-    <h1>Raw JSON Output: /r/all.json</h1>
-    <div id="status" class="loading">Fetching raw data...</div>
-    <pre id="json-output"></pre>
+
+    <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <span class="material-symbols-outlined">apps</span>
+            <span style="font-weight: 600;">Outlook Enterprise</span>
+        </div>
+        <div style="background: #333; width: 400px; height: 32px; border-radius: 4px; display: flex; align-items: center; padding: 0 10px;">
+            <span class="material-symbols-outlined" style="font-size: 1.2rem; color: #aaa;">search</span>
+            <input type="text" placeholder="Search mission intelligence" style="background:none; border:none; color:white; padding-left:10px; width:100%; outline:none;">
+        </div>
+        <div><span class="material-symbols-outlined">settings</span></div>
+    </header>
+
+    <div class="main-container">
+        <nav class="app-rail">
+            <span class="material-symbols-outlined" style="color:var(--accent-blue)">mail</span>
+            <span class="material-symbols-outlined">calendar_month</span>
+            <span class="material-symbols-outlined">description</span>
+        </nav>
+
+        <nav class="folder-pane">
+            <div style="padding: 8px 16px; color:var(--accent-blue); font-weight:bold; display:flex; align-items:center; gap:12px;">
+                <span class="material-symbols-outlined">inbox</span> Inbox
+            </div>
+            <div style="padding: 8px 16px; color:#888; display:flex; align-items:center; gap:12px;">
+                <span class="material-symbols-outlined">send</span> Sent
+            </div>
+        </nav>
+
+        <section class="message-list">
+            <div class="list-header">All Intelligence</div>
+            <div id="inbox-container">
+                <div class="loading-state">Synchronizing with secure feed...</div>
+            </div>
+        </section>
+
+        <main class="reading-pane" id="reading-pane">
+            <div style="height: 100%; display: flex; align-items: center; justify-content: center; color: #555;">
+                <h3>Select an item to read</h3>
+            </div>
+        </main>
+    </div>
 
     <script>
-        async function fetchRawJson() {
-            const output = document.getElementById('json-output');
-            const status = document.getElementById('status');
+        const inbox = document.getElementById('inbox-container');
+        const reader = document.getElementById('reading-pane');
 
+        async function fetchIntelligence() {
             try {
-                const response = await fetch('https://www.reddit.com/r/all.json');
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP Error: ${response.status}`);
-                }
+                // Fetching Reddit data
+                const response = await fetch('https://www.reddit.com/r/all.json?limit=250');
+                const json = await response.json();
+                const posts = json.data.children;
 
-                const data = await response.json();
-                
-                // Convert JSON object to human-readable string with 2-space indentation
-                output.textContent = JSON.stringify(data, null, 2);
-                status.style.display = 'none';
+                inbox.innerHTML = ''; // Clear loading
+
+                posts.forEach((post, index) => {
+                    const data = post.data;
+                    const msg = document.createElement('div');
+                    msg.className = 'msg-item';
+                    msg.innerHTML = `
+                        <div class="msg-sender">u/${data.author} <span style="font-weight:normal; color:#666;">${new Date(data.created_utc * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span></div>
+                        <div class="msg-subject">${data.title}</div>
+                        <div class="msg-preview">${data.selftext || 'External link: ' + data.url}</div>
+                    `;
+                    
+                    msg.onclick = () => {
+                        // Update active state
+                        document.querySelectorAll('.msg-item').forEach(el => el.classList.remove('active'));
+                        msg.classList.add('active');
+                        
+                        // Update Reading Pane
+                        renderEmail(data);
+                    };
+
+                    inbox.appendChild(msg);
+                });
 
             } catch (err) {
-                status.className = 'error';
-                status.innerHTML = `<strong>Error:</strong> ${err.message}<br><br>` +
-                                 `<em>Note: If you see a CORS error, Reddit is blocking the browser request.</em>`;
+                inbox.innerHTML = `<div style="padding:20px; color:#f44336;">Feed Error: Check CORS or Network Connection.</div>`;
             }
         }
 
-        fetchRawJson();
+        function renderEmail(data) {
+            reader.innerHTML = `
+                <div class="email-header">
+                    <div class="email-subject">${data.title}</div>
+                    <div class="email-meta">
+                        <div class="avatar" style="background-color: #2899f5;">${data.author[0].toUpperCase()}</div>
+                        <div style="flex:1">
+                            <h4 style="margin:0">u/${data.author}</h4>
+                            <p style="margin:0; font-size:0.8rem; color:#888;">Source: r/${data.subreddit} | Upvotes: ${data.score}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="email-body">
+                    ${data.selftext ? data.selftext.replace(/\n/g, '<br>') : `<p>View external content: <a href="${data.url}" target="_blank" style="color:var(--accent-blue)">${data.url}</a></p>`}
+                </div>
+            `;
+        }
+
+        fetchIntelligence();
     </script>
 </body>
 </html>
